@@ -54,6 +54,8 @@ func (p *Parser) Start() {
 	go p.processQueue()   // send from queue to logist (this goroutine is for avoiding deadlocks)
 	go p.printQueueInfo() // prints statistic every N seconds
 	go p.logist.Start()   // start logist
+
+	// TODO: waiting until all queues are empty (and possibly rename method)
 }
 
 func (p *Parser) processErrors() {
@@ -91,7 +93,7 @@ func (p *Parser) processQueue() {
 		logrus.WithField("url", page.Url).Printf("parser: sending to logist")
 		p.logist.Fetch(page)
 
-		p.processed[page.Url] = true
+		p.processed[page.Url] = true // TODO: move to logist?
 	}
 }
 
@@ -125,78 +127,96 @@ func (p *Parser) parse(page *Page) {
 	//    /                          ___ what to parse
 	//   /                          /              ___ how to parse
 	//  /                          /              /
-	page.Tree = p.parseRecursive(doc.Selection, config)
+	tree, childPages := p.parseRecursive(doc.Selection, config)
+
+	page.Tree = tree
+	for _, childPage := range childPages {
+		childPage.ReferrerUrl = page.FullUrl // set important info for fetcher (for resolving relative page.Url)
+		p.Queue(childPage)
+	}
 
 	//spew.Dump(page.Tree)
 }
 
-func (p *Parser) parseRecursive(doc *goquery.Selection, config *ConfigEntity) *Block {
+func (p *Parser) parseRecursive(doc *goquery.Selection, config *ConfigEntity) (*Block, []*Page) {
 	// prepare place for savement
 	block := &Block{
 		Fields: make(map[string][]ValueOrBlock),
 	}
 
+	pages := make([]*Page, 0) // all new pages for fetching will be saved here
+
 	for _, route := range config.Routes {
 		sel := doc.Find(route.Selector) // sub-document selection
 
-		var data []ValueOrBlock
+		var (
+			data   []ValueOrBlock
+			pages_ []*Page
+		)
+
 		// TODO: mediator pattern?
 		switch route.Type {
 		case "page":
-			data = p.parsePages(sel, route)
+			data, pages_ = p.parsePages(sel, route)
 		case "block":
-			data = p.parseBlocks(sel, route)
+			data, pages_ = p.parseBlocks(sel, route)
 		case "file":
-			data = p.downloadPages(sel, route)
+			data, pages_ = p.downloadPages(sel, route)
 		}
 
 		block.Fields[route.Name] = data
+		pages = append(pages, pages_...)
 	}
 
-	return block
+	return block, pages
 }
 
-func (p *Parser) parsePages(sel *goquery.Selection, route *Route) []ValueOrBlock {
+func (p *Parser) parsePages(sel *goquery.Selection, route *Route) ([]ValueOrBlock, []*Page) {
 	logrus.WithField("name", route.Name).Info("parser: parsing pages")
 
-	res := make([]ValueOrBlock, 0)
+	values := make([]ValueOrBlock, 0)
+	pages := make([]*Page, 0)
+
 	for _, url := range p.extractUrls(sel) {
 		logrus.WithField("url", url).Info("parser: found new page")
 
-		res = append(res, url)
+		values = append(values, url)
 
-		p.Queue(&Page{
+		pages = append(pages, &Page{
 			Name: route.Name,
 			Url:  url,
 		})
 	}
 
-	return res
+	return values, pages
 }
 
-func (p *Parser) parseBlocks(sel *goquery.Selection, route *Route) []ValueOrBlock {
+func (p *Parser) parseBlocks(sel *goquery.Selection, route *Route) ([]ValueOrBlock, []*Page) {
 	logrus.WithField("name", route.Name).Info("parser: parsing blocks")
-	return nil
+
+	// TODO: write actual code
+	return nil, nil
 }
 
-func (p *Parser) downloadPages(sel *goquery.Selection, route *Route) []ValueOrBlock {
+func (p *Parser) downloadPages(sel *goquery.Selection, route *Route) ([]ValueOrBlock, []*Page) {
 	logrus.WithField("name", route.Name).Info("parser: parsing downloads")
 
-	res := make([]ValueOrBlock, 0)
+	values := make([]ValueOrBlock, 0)
+	pages := make([]*Page, 0)
 
 	for _, url := range p.extractUrls(sel) {
 		logrus.WithField("url", url).Info("parser: found new download")
 
-		res = append(res, url)
+		values = append(values, url)
 
-		p.Queue(&Page{
+		pages = append(pages, &Page{
 			Name:   route.Name,
 			Url:    url,
 			IsFile: true,
 		})
 	}
 
-	return res
+	return values, pages
 }
 
 func (p *Parser) extractUrls(sel *goquery.Selection) []string {

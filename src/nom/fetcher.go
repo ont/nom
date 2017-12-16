@@ -30,10 +30,15 @@ type FetcherSimple struct {
 	queue    chan *Page
 }
 
-func NewFetcherSimple(base string, delay int) (*FetcherSimple, error) {
-	baseUrl, err := url.Parse(base)
+func NewFetcherSimple(pageUrl string, delay int) (*FetcherSimple, error) {
+	parsedUrl, err := url.Parse(pageUrl)
 	if err != nil {
 		return nil, err
+	}
+
+	baseUrl := &url.URL{
+		Scheme: parsedUrl.Scheme,
+		Host:   parsedUrl.Host,
 	}
 
 	return &FetcherSimple{
@@ -58,14 +63,14 @@ func (f *FetcherSimple) Start() {
 }
 
 func (f *FetcherSimple) fetch(page *Page) {
-	purl, err := url.Parse(page.Url)
+	fullUrl, err := f.resolveFullUrl(page)
 	if err != nil {
 		logrus.WithField("url", page.Url).WithError(err).Error("fetcher: wrong url")
 		f.dropPage(page, err)
 		return
 	}
 
-	page.FullUrl = f.Base.ResolveReference(purl).String()
+	page.FullUrl = fullUrl
 
 	res, err := http.Get(page.FullUrl)
 	if err != nil {
@@ -102,6 +107,27 @@ func (f *FetcherSimple) fetch(page *Page) {
 	}
 
 	f.delivery <- page
+}
+
+func (f *FetcherSimple) resolveFullUrl(page *Page) (string, error) {
+	pUrl, err := url.Parse(page.Url)
+	if err != nil {
+		return "", err
+	}
+
+	// resolve page.Url based on page.ReferrerUrl
+	// TODO: take into account <base/> tag on page
+	if page.ReferrerUrl != "" {
+		rUrl, err := url.Parse(page.ReferrerUrl)
+		if err != nil {
+			return "", err
+		}
+
+		pUrl = rUrl.ResolveReference(pUrl) // update page url
+	}
+
+	// finally resolve resolved page.Url (make it absolute url)
+	return f.Base.ResolveReference(pUrl).String(), nil
 }
 
 func (f *FetcherSimple) parseFileName(resp *http.Response, page *Page) error {

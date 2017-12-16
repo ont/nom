@@ -10,7 +10,11 @@ import (
 )
 
 var (
-	config = kingpin.Flag("config", "Config file which describes pages and entities for parsing").File()
+	config   = kingpin.Flag("config", "Config file which describes pages and entities for parsing.").File()
+	delay    = kingpin.Flag("delay", "Delay between pages fetching.").Default("10").Int()
+	cache    = kingpin.Flag("cache", "Cache for fetched and possibly parsed pages.").Default("./cache").String()
+	startUrl = kingpin.Arg("url", "Starting url to start parsing from.").Required().String()
+	name     = kingpin.Arg("name", "Name of page in config file.").Required().String()
 )
 
 func main() {
@@ -30,10 +34,10 @@ func main() {
 	spew.Dump(grammar)
 
 	storage := &StorageFiles{
-		Base: "./cache",
+		Base: *cache,
 	}
 
-	fetcher, err := NewFetcherSimple("http://mnogonot.ucoz.ru", 10)
+	fetcher, err := NewFetcherSimple(*startUrl, *delay)
 	if err != nil {
 		log.Fatalln("Error creating fetcher: ", err)
 	}
@@ -41,12 +45,13 @@ func main() {
 	logist := NewLogist(fetcher, storage)
 	parser := NewParser(grammar, logist)
 
-	go parser.Start()
-
 	parser.Queue(&Page{
-		Name: "content",
-		Url:  "/load/partitury/11",
+		Name: *name,
+		Url:  *startUrl, // TODO: convert to relative?
 	})
+
+	// TODO: replace for-loop and go-routine with simple method call (parser.StartAndWait())
+	go parser.Start()
 
 	for {
 		time.Sleep(1 * time.Second)

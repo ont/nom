@@ -11,9 +11,10 @@ import (
 type Page struct {
 	Name string // name of config block to parse with
 
-	Url      string // url as it was in parsed html
-	FullUrl  string // start url from which page was really downloaded (page.Url normalized inside fetcher)
-	FinalUrl string // final url after all redirects
+	Url         string // url as it was in parsed html
+	ReferrerUrl string // full url of referrer page (for relative page.Url resolving)
+	FullUrl     string // start url from which page was really downloaded (page.Url normalized inside fetcher)
+	FinalUrl    string // final url after all redirects
 
 	IsFile   bool   // true - if Body contains bytes of downloaded file
 	FileName string // filename (from Content-Disposition header or FinalUrl)
