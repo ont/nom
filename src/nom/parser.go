@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -194,8 +195,25 @@ func (p *Parser) parsePages(sel *goquery.Selection, route *Route) ([]ValueOrBloc
 func (p *Parser) parseBlocks(sel *goquery.Selection, route *Route) ([]ValueOrBlock, []*Page) {
 	logrus.WithField("name", route.Name).Info("parser: parsing blocks")
 
-	// TODO: write actual code
-	return nil, nil
+	values := make([]ValueOrBlock, 0)
+	pages := make([]*Page, 0)
+
+	config, found := p.blocksConfigs[route.Name]
+	if found {
+		logrus.WithField("name", route.Name).Info("parser: parsing block recursively...")
+
+		sel.Each(func(i int, sel *goquery.Selection) {
+			block, pages_ := p.parseRecursive(sel, config)
+
+			values = append(values, block)
+			pages = append(pages, pages_...)
+		})
+		return values, pages
+	}
+
+	text := strings.TrimSpace(sel.Text())
+	logrus.WithField("value", text).Info("parser: found raw block")
+	return []ValueOrBlock{text}, nil
 }
 
 func (p *Parser) downloadPages(sel *goquery.Selection, route *Route) ([]ValueOrBlock, []*Page) {
