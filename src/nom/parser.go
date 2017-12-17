@@ -124,10 +124,10 @@ func (p *Parser) parse(page *Page) {
 		return
 	}
 
-	//     ___ save parsed results here
-	//    /                          ___ what to parse
-	//   /                          /              ___ how to parse
-	//  /                          /              /
+	//     ___ save parsed results here (string values inside blocks inside blocks inside blocks...)
+	//    /     ___ new pages for fetcher      ___ what to parse
+	//   /     /                              /              ___ how to parse
+	//  /     /                              /              /
 	tree, childPages := p.parseRecursive(doc.Selection, config)
 
 	page.Tree = tree
