@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 )
 
 type StorageFiles struct {
@@ -47,4 +48,18 @@ func (c *StorageFiles) getPath(url string) string {
 	hash := md5.Sum([]byte(url))
 	name := hex.EncodeToString(hash[:])
 	return c.Base + "/" + name[0:2] + "/" + name[2:4] + "/" + name + ".pac"
+}
+
+func (c *StorageFiles) Iterate() <-chan *Page {
+	ch := make(chan *Page)
+	go func() {
+		filepath.Walk(c.Base, func(path string, f os.FileInfo, err error) error {
+			if !f.IsDir() {
+				ch <- c.PageFromFile(path)
+			}
+			return err
+		})
+		close(ch)
+	}()
+	return ch
 }

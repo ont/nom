@@ -2,7 +2,7 @@ package main
 
 import (
 	//"fmt"
-	"github.com/davecgh/go-spew/spew"
+	//"github.com/davecgh/go-spew/spew"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"io/ioutil"
 	"log"
@@ -13,6 +13,7 @@ var (
 	config   = kingpin.Flag("config", "Config file which describes pages and entities for parsing.").File()
 	delay    = kingpin.Flag("delay", "Delay between pages fetching.").Default("10").Int()
 	cache    = kingpin.Flag("cache", "Cache for fetched and possibly parsed pages.").Default("./cache").String()
+	export   = kingpin.Flag("export", "Exporting rule.").String()
 	startUrl = kingpin.Arg("url", "Starting url to start parsing from.").Required().String()
 	name     = kingpin.Arg("name", "Name of page in config file.").Required().String()
 )
@@ -20,6 +21,16 @@ var (
 func main() {
 	kingpin.Version("0.0.1")
 	kingpin.Parse()
+
+	storage := &StorageFiles{
+		Base: *cache,
+	}
+
+	if *export != "" {
+		exporter := NewExporter(storage, *export)
+		exporter.Export()
+		return
+	}
 
 	data, err := ioutil.ReadAll(*config)
 	if err != nil {
@@ -29,12 +40,6 @@ func main() {
 	grammar, err := parseConfig(string(data))
 	if err != nil {
 		log.Fatalln("Error parsing config file: ", err)
-	}
-
-	spew.Dump(grammar)
-
-	storage := &StorageFiles{
-		Base: *cache,
 	}
 
 	fetcher, err := NewFetcherSimple(*startUrl, *delay)
