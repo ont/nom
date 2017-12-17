@@ -199,7 +199,9 @@ func (p *Parser) parseBlocks(sel *goquery.Selection, route *Route) ([]ValueOrBlo
 	pages := make([]*Page, 0)
 
 	config, found := p.blocksConfigs[route.Name]
-	if found {
+
+	if found { // parse complex block which may consist of another blocks or link to pages, etc...
+
 		logrus.WithField("name", route.Name).Info("parser: parsing block recursively...")
 
 		sel.Each(func(i int, sel *goquery.Selection) {
@@ -209,11 +211,14 @@ func (p *Parser) parseBlocks(sel *goquery.Selection, route *Route) ([]ValueOrBlo
 			pages = append(pages, pages_...)
 		})
 		return values, pages
-	}
 
-	text := strings.TrimSpace(sel.Text())
-	logrus.WithField("value", text).Info("parser: found raw block")
-	return []ValueOrBlock{text}, nil
+	} else { // parse simple block which just simple text value
+
+		text := strings.TrimSpace(sel.Text())
+		logrus.WithField("value", text).Info("parser: found raw block")
+		return []ValueOrBlock{text}, nil
+
+	}
 }
 
 func (p *Parser) downloadPages(sel *goquery.Selection, route *Route) ([]ValueOrBlock, []*Page) {
