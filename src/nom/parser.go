@@ -256,6 +256,10 @@ func (p *Parser) extractUrls(sel *goquery.Selection) []string {
 
 		case sel.Closest("[href]").Length() > 0:
 			url, found = sel.Closest("[href]").Attr("href")
+
+		// case for images
+		case sel.Closest("[src]").Length() > 0:
+			url, found = sel.Closest("[src]").Attr("src")
 		}
 
 		if found {
