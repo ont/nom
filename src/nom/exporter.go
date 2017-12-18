@@ -111,6 +111,7 @@ func (e *Exporter) exportRecursive(path string, page *Page, extractChilds bool, 
 			childPage := e.storage.Get(url)
 			if childPage == nil {
 				logrus.WithField("url", url).Error("exporter: can't load page")
+				return
 			}
 
 			// NOTE: we just create multiple branches at token-step,
